@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
-import base64
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -11,34 +10,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
-
-# Descobre o diretório exato onde o script DSPI.py está localizado
-DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
-DIRETORIO_PAI = os.path.dirname(DIRETORIO_ATUAL)
-
-# Nomes possíveis do arquivo de imagem
-POSSIVEIS_NOMES = [
-    "Tecno Grill_27923a.jpg.jpg",
-    "Tecno Grill_27923a.jpg",
-    "Tecno Grill_27923a.JPG"
-]
-
-# Procura a imagem no diretório do script, no diretório pai e no diretório de execução
-caminho_logo = None
-for nome in POSSIVEIS_NOMES:
-    locais = [
-        os.path.join(DIRETORIO_ATUAL, nome),
-        os.path.join(DIRETORIO_PAI, nome),
-        nome
-    ]
-    for loc in locais:
-        if os.path.exists(loc):
-            caminho_logo = loc
-            break
-    if caminho_logo:
-        break
-
-ARQUIVO_LOG = os.path.join(DIRETORIO_ATUAL, "historico_uso.csv")
 
 # --- ESTILIZAÇÃO VISUAL (CSS) ---
 st.markdown("""
@@ -71,16 +42,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# URL direta da imagem no GitHub (garante exibição tanto localmente como na nuvem)
+URL_LOGO_GITHUB = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg"
+
 # --- CABEÇALHO COM LOGÓTIPO ---
-if caminho_logo:
-    try:
-        with open(caminho_logo, "rb") as f:
-            data_imagem = f.read()
-        col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
-        with col_logo2:
-            st.image(data_imagem, use_container_width=True)
-    except Exception:
-        pass
+col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+with col_logo2:
+    st.image(URL_LOGO_GITHUB, use_container_width=True)
 
 st.title("⚡ Tecno Grill - Controle de Operação")
 st.caption("Limpeza de Grelhas para Corte a Laser")
@@ -138,6 +106,8 @@ grelhas_limpas = st.number_input(
     disabled=not st.session_state.em_execucao,
     help="Bloqueado até clicar em INICIAR."
 )
+
+ARQUIVO_LOG = "historico_uso.csv"
 
 if st.session_state.em_execucao:
     if st.button("💾 GRAVAR REGISTRO DE LIMPEZA", use_container_width=True):
