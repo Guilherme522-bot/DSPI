@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # --- CONFIGURAÇÃO DO LOGO E CAMINHO DO ARQUIVO ---
-NOME_ARQUIVO_LOGO = "Tecno Grill_27923a.jpg"  # Nome da imagem conforme subida no GitHub
+NOME_ARQUIVO_LOGO = "Tecno Grill_27923a.jpg"
 ARQUIVO_LOG = "historico_uso.csv"
 
 # --- FUNÇÃO PARA CONVERTER IMAGEM PARA BASE64 ---
@@ -25,7 +25,7 @@ def get_base64_image(image_path):
 
 logo_base64 = get_base64_image(NOME_ARQUIVO_LOGO)
 
-# --- SPLASH SCREEN (TELA DE ABERTURA) ---
+# --- SPLASH SCREEN ---
 splash_screen_html = f"""
     <div id="splash-screen">
         <div id="splash-content">
@@ -49,20 +49,17 @@ splash_screen_html = f"""
             z-index: 10000;
             transition: opacity 1s ease, visibility 1s ease;
         }}
-
         #splash-content {{
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }}
-
         #splash-logo {{
             max-width: 320px;
             height: auto;
             margin-bottom: 25px;
         }}
-
         #loader {{
             border: 4px solid #e1e1e1;
             border-top: 4px solid #0056b3;
@@ -72,19 +69,16 @@ splash_screen_html = f"""
             animation: spin 1s linear infinite;
             margin-bottom: 15px;
         }}
-
         #splash-text {{
             color: #555555;
             font-size: 15px;
             font-family: sans-serif;
             margin: 0;
         }}
-
         #splash-screen.fade-out {{
             opacity: 0;
             visibility: hidden;
         }}
-
         @keyframes spin {{
             0% {{ transform: rotate(0deg); }}
             100% {{ transform: rotate(360deg); }}
@@ -103,33 +97,17 @@ splash_screen_html = f"""
 
 st.components.v1.html(splash_screen_html, height=0)
 
-# --- ESTILIZAÇÃO VISUAL (CSS) ---
+# --- ESTILIZAÇÃO VISUAL ---
 st.markdown("""
     <style>
-    .stApp {
-        margin-top: -30px;
-    }
+    .stApp { margin-top: -30px; }
     div.stButton > button[data-testid="baseButton-primary"] {
-        background-color: #16a34a !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-primary"]:hover {
-        background-color: #15803d !important;
+        background-color: #16a34a !important; color: #ffffff !important; border: none !important;
+        font-weight: bold !important; font-size: 18px !important; height: 3.5em !important;
     }
     div.stButton > button[data-testid="baseButton-secondary"] {
-        background-color: #dc2626 !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-secondary"]:hover {
-        background-color: #b91c1c !important;
+        background-color: #dc2626 !important; color: #ffffff !important; border: none !important;
+        font-weight: bold !important; font-size: 18px !important; height: 3.5em !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -154,7 +132,6 @@ st.divider()
 
 # --- PAINEL DE CONTROLE ---
 st.subheader("🕹️ Painel de Controle")
-
 col_btn1, col_btn2 = st.columns(2)
 
 with col_btn1:
@@ -185,11 +162,8 @@ if not st.session_state.em_execucao:
 
 grelhas_limpas = st.number_input(
     "Quantidade de Grelhas Limpas nesta sessão:", 
-    min_value=0, 
-    step=1, 
-    value=0,
-    disabled=not st.session_state.em_execucao,
-    help="Bloqueado até clicar em INICIAR."
+    min_value=0, step=1, value=0,
+    disabled=not st.session_state.em_execucao
 )
 
 if st.session_state.em_execucao:
@@ -202,51 +176,48 @@ if st.session_state.em_execucao:
             hora_fim_str = agora.strftime("%H:%M:%S")
             data_str = agora.strftime("%Y-%m-%d")
             
-            novo_registro = {
+            # Estrutura com colunas separadas
+            novo_registro = pd.DataFrame([{
                 "Data": data_str,
                 "Hora Início": hora_inicio_str,
                 "Hora Fim": hora_fim_str,
                 "Operador": operador,
                 "Grelhas Limpas": grelhas_limpas
-            }
+            }])
             
-            file_exists = os.path.exists(ARQUIVO_LOG)
-            df_novo = pd.DataFrame([novo_registro])
-            df_novo.to_csv(ARQUIVO_LOG, mode='a', index=False, header=not file_exists)
+            # Se o arquivo não existir ou for antigo, cria/sobrescreve com o novo formato
+            if not os.path.exists(ARQUIVO_LOG):
+                novo_registro.to_csv(ARQUIVO_LOG, index=False)
+            else:
+                try:
+                    df_existente = pd.read_csv(ARQUIVO_LOG)
+                    # Verifica se o CSV antigo ainda tem o formato antigo
+                    if "Hora Início" not in df_existente.columns:
+                        novo_registro.to_csv(ARQUIVO_LOG, index=False)
+                    else:
+                        novo_registro.to_csv(ARQUIVO_LOG, mode='a', index=False, header=False)
+                except Exception:
+                    novo_registro.to_csv(ARQUIVO_LOG, index=False)
             
             st.session_state.hora_inicio = datetime.now()
-            
-            st.success(f"✅ Registrado: {grelhas_limpas} grelha(s) por {operador} (Início: {hora_inicio_str} | Fim: {hora_fim_str})")
+            st.success("✅ Registro gravado com sucesso!")
             st.rerun()
 
 st.divider()
 
-# --- HISTÓRICO E CONTADOR DIÁRIO ---
+# --- HISTÓRICO ---
 st.subheader("📋 Histórico de Operações")
 
-colunas_padrao = ["Data", "Hora Início", "Hora Fim", "Operador", "Grelhas Limpas"]
+colunas_desejadas = ["Data", "Hora Início", "Hora Fim", "Operador", "Grelhas Limpas"]
 
 if os.path.exists(ARQUIVO_LOG):
     try:
         df_log = pd.read_csv(ARQUIVO_LOG)
+        # Garante que só exibe as colunas novas e separadas
+        df_log = df_log.reindex(columns=colunas_desejadas).fillna("-")
     except Exception:
-        df_log = pd.DataFrame(columns=colunas_padrao)
+        df_log = pd.DataFrame(columns=colunas_desejadas)
 else:
-    df_log = pd.DataFrame(columns=colunas_padrao)
-
-grelhas_hoje = 0
-
-if not df_log.empty and "Data" in df_log.columns:
-    if "Grelhas Limpas" in df_log.columns:
-        df_log["Grelhas Limpas"] = pd.to_numeric(df_log["Grelhas Limpas"], errors='coerce').fillna(0).astype(int)
-    else:
-        df_log["Grelhas Limpas"] = 0
-
-    hoje_str = datetime.now().strftime("%Y-%m-%d")
-    df_hoje = df_log[df_log['Data'].astype(str) == hoje_str]
-    grelhas_hoje = df_hoje["Grelhas Limpas"].sum()
-
-st.metric(label="📅 Grelhas Limpas HOJE", value=int(grelhas_hoje))
-st.write("")
+    df_log = pd.DataFrame(columns=colunas_desejadas)
 
 st.dataframe(df_log.iloc[::-1], use_container_width=True)
