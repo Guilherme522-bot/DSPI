@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+import base64
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -13,22 +14,28 @@ st.set_page_config(
 
 # Descobre o diretório exato onde o script DSPI.py está localizado
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
+DIRETORIO_PAI = os.path.dirname(DIRETORIO_ATUAL)
 
-# Tenta localizar a imagem na mesma pasta do script
+# Nomes possíveis do arquivo de imagem
 POSSIVEIS_NOMES = [
     "Tecno Grill_27923a.jpg.jpg",
     "Tecno Grill_27923a.jpg",
     "Tecno Grill_27923a.JPG"
 ]
 
+# Procura a imagem no diretório do script, no diretório pai e no diretório de execução
 caminho_logo = None
 for nome in POSSIVEIS_NOMES:
-    caminho_tentativa = os.path.join(DIRETORIO_ATUAL, nome)
-    if os.path.exists(caminho_tentativa):
-        caminho_logo = caminho_tentativa
-        break
-    elif os.path.exists(nome):
-        caminho_logo = nome
+    locais = [
+        os.path.join(DIRETORIO_ATUAL, nome),
+        os.path.join(DIRETORIO_PAI, nome),
+        nome
+    ]
+    for loc in locais:
+        if os.path.exists(loc):
+            caminho_logo = loc
+            break
+    if caminho_logo:
         break
 
 ARQUIVO_LOG = os.path.join(DIRETORIO_ATUAL, "historico_uso.csv")
@@ -66,9 +73,14 @@ st.markdown("""
 
 # --- CABEÇALHO COM LOGÓTIPO ---
 if caminho_logo:
-    col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
-    with col_logo2:
-        st.image(caminho_logo, use_container_width=True)
+    try:
+        with open(caminho_logo, "rb") as f:
+            data_imagem = f.read()
+        col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
+        with col_logo2:
+            st.image(data_imagem, use_container_width=True)
+    except Exception:
+        pass
 
 st.title("⚡ Tecno Grill - Controle de Operação")
 st.caption("Limpeza de Grelhas para Corte a Laser")
