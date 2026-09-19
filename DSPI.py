@@ -42,13 +42,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# URL direta da imagem no GitHub (garante exibição tanto localmente como na nuvem)
-URL_LOGO_GITHUB = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg"
+# URL direta com extensão dupla (.jpg.jpg) conforme detetado no GitHub
+URL_LOGO_GITHUB_1 = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg.jpg"
+URL_LOGO_GITHUB_2 = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg"
 
 # --- CABEÇALHO COM LOGÓTIPO ---
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
-    st.image(URL_LOGO_GITHUB, use_container_width=True)
+    # Tenta primeiro a URL com .jpg.jpg que está no seu GitHub
+    try:
+        st.image(URL_LOGO_GITHUB_1, use_container_width=True)
+    except Exception:
+        st.image(URL_LOGO_GITHUB_2, use_container_width=True)
 
 st.title("⚡ Tecno Grill - Controle de Operação")
 st.caption("Limpeza de Grelhas para Corte a Laser")
