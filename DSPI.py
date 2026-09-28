@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
+import serial
+import time
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -12,7 +14,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Função auxiliar para capturar a hora exata no fuso horário de Brasília
+# --- CONFIGURAÇÃO DA COMUNICAÇÃO SERIAL / ARDUINO ---
+# Altere 'COM3' para a porta COM em que o seu Arduino está conectado no Windows
+PORTA_SERIAL = "COM3"
+BAUD_RATE = 9600
+
+def enviar_comando_arduino(comando):
+    """
+    Envia caracteres de controle para o Arduino:
+    'L' -> LIGA
+    'D' -> DESLIGA / BLOQUEIA
+    'H' -> SENTIDO HORÁRIO
+    'A' -> SENTIDO ANTI-HORÁRIO
+    """
+    try:
+        ser = serial.Serial(PORTA_SERIAL, BAUD_RATE, timeout=1)
+        time.sleep(0.2)  # Estabilização da conexão Serial
+        ser.write(comando.encode('utf-8'))
+        ser.close()
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Erro de comunicação na porta {PORTA_SERIAL}: {e}")
+        return False
+
+# Função auxiliar para capturar a hora exata no fuso de Brasília
 def obter_hora_brasilia():
     return datetime.now(ZoneInfo("America/Sao_Paulo"))
 
@@ -21,7 +46,7 @@ st.markdown("""
     
 """, unsafe_allow_html=True)
 
-# URL direta com extensão dupla (.jpg.jpg) conforme detetado no GitHub
+# URL da logo no GitHub
 URL_LOGO_GITHUB_1 = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg.jpg"
 URL_LOGO_GITHUB_2 = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/main/Tecno%20Grill_27923a.jpg"
 
@@ -34,7 +59,7 @@ with col_logo2:
         st.image(URL_LOGO_GITHUB_2, use_container_width=True)
 
 st.title("⚡ Tecno Grill - Controle de Operação")
-st.caption("Limpeza de Grelhas para Corte a Laser")
+st.caption("Sistema de Controle e Liberação de Máquina")
 
 st.divider()
 
@@ -44,59 +69,56 @@ if "em_execucao" not in st.session_state:
 if "hora_inicio" not in st.session_state:
     st.session_state.hora_inicio = None
 
-# --- OPERADOR ---
-st.subheader("👤 Identificação do Operador")
-operador = st.text_input("Nome Completo:", placeholder="Digite seu nome completo")
+# --- STATUS DA MÁQUINA (BLOQUEADO / LIBERADO) ---
+if st.session_state.em_execucao:
+    st.success("🟢 **MÁQUINA LIBERADA E EM OPERAÇÃO**")
+else:
+    st.error("🔴 **MÁQUINA BLOQUEADA** — Preencha a identificação abaixo para liberar o uso.")
 
 st.divider()
 
-# --- PAINEL DE CONTROLE ---
-st.subheader("🕹️ Painel de Controle")
+# --- OPERADOR E PARÂMETROS ---
+st.subheader("👤 Identificação do Operador")
+operador = st.text_input(
+    "Nome do Operador:", 
+    placeholder="Digite seu nome completo", 
+    disabled=st.session_state.em_execucao
+)
+
+grelhas_limpas = st.number_input(
+    "Quantidade de Grelhas a Limpar nesta sessão:", 
+    min_value=1, 
+    step=1, 
+    value=1,
+    disabled=st.session_state.em_execucao,
+    help="Informe quantas grelhas serão limpas durante este ciclo."
+)
+
+st.divider()
+
+# --- PAINEL DE COMANDO ---
+st.subheader("🕹️ Painel de Comando")
 
 col_btn1, col_btn2 = st.columns(2)
 
 with col_btn1:
-    if st.button("🟢 INICIAR", type="primary", use_container_width=True):
+    if st.button("🟢 INICIAR & LIBERAR MÁQUINA", type="primary", use_container_width=True, disabled=st.session_state.em_execucao):
         if not operador.strip():
-            st.error("⚠️ Por favor, informe o nome do operador antes de iniciar!")
+            st.error("⚠️ Preenchimento obrigatório: Digite o nome do operador para liberar a máquina.")
         else:
-            st.session_state.em_execucao = True
-            st.session_state.hora_inicio = obter_hora_brasilia()
-            st.success(f"🚀 Processo iniciado às {st.session_state.hora_inicio.strftime('%H:%M:%S')}!")
+            # Envia 'L' para acionar a liberação do motor no Arduino
+            if enviar_comando_arduino("L"):
+                st.session_state.em_execucao = True
+                st.session_state.hora_inicio = obter_hora_brasilia()
+                st.success(f"🚀 Máquina liberada com sucesso às {st.session_state.hora_inicio.strftime('%H:%M:%S')}!")
+                st.rerun()
 
 with col_btn2:
-    if st.button("🔴 PARAR", type="secondary", use_container_width=True):
+    if st.button("🔴 PARAR & BLOQUEAR MÁQUINA", type="secondary", use_container_width=True, disabled=not st.session_state.em_execucao):
         if st.session_state.em_execucao:
-            st.session_state.em_execucao = False
-            hora_fim = obter_hora_brasilia()
-            st.warning(f"⏹️ Processo interrompido às {hora_fim.strftime('%H:%M:%S')}.")
-        else:
-            st.info("A máquina já está parada.")
-
-st.divider()
-
-# --- REGISTRO DE GRELHAS ---
-st.subheader("📊 Produção e Registro de Grelhas")
-
-if not st.session_state.em_execucao:
-    st.info("🔒 O campo abaixo está **bloqueado**. Clique no botão **🟢 INICIAR** acima para liberar a digitação.")
-
-grelhas_limpas = st.number_input(
-    "Quantidade de Grelhas Limpas nesta sessão:", 
-    min_value=0, 
-    step=1, 
-    value=0,
-    disabled=not st.session_state.em_execucao,
-    help="Bloqueado até clicar em INICIAR."
-)
-
-ARQUIVO_LOG = "historico_uso.csv"
-
-if st.session_state.em_execucao:
-    if st.button("💾 GRAVAR REGISTRO DE LIMPEZA", use_container_width=True):
-        if grelhas_limpas <= 0:
-            st.warning("⚠️ Informe uma quantidade maior que 0 para gravar.")
-        else:
+            # Envia 'D' para desativar e bloquear a máquina no Arduino
+            enviar_comando_arduino("D")
+            
             agora = obter_hora_brasilia()
             hora_inicio_str = st.session_state.hora_inicio.strftime("%H:%M:%S") if st.session_state.hora_inicio else agora.strftime("%H:%M:%S")
             hora_fim_str = agora.strftime("%H:%M:%S")
@@ -110,20 +132,17 @@ if st.session_state.em_execucao:
                 "Grelhas Limpas": grelhas_limpas
             }])
             
+            ARQUIVO_LOG = "historico_uso.csv"
             if not os.path.exists(ARQUIVO_LOG):
                 novo_registro.to_csv(ARQUIVO_LOG, index=False)
             else:
                 try:
-                    df_existente = pd.read_csv(ARQUIVO_LOG)
-                    if "Hora Início" not in df_existente.columns:
-                        novo_registro.to_csv(ARQUIVO_LOG, index=False)
-                    else:
-                        novo_registro.to_csv(ARQUIVO_LOG, mode='a', index=False, header=False)
+                    novo_registro.to_csv(ARQUIVO_LOG, mode='a', index=False, header=False)
                 except Exception:
                     novo_registro.to_csv(ARQUIVO_LOG, index=False)
             
-            st.session_state.hora_inicio = obter_hora_brasilia()
-            st.success(f"✅ Registrado: {grelhas_limpas} grelha(s) por {operador} (Início: {hora_inicio_str} | Fim: {hora_fim_str})")
+            st.session_state.em_execucao = False
+            st.warning(f"⏹️ Operação encerrada às {hora_fim_str}. Registro salvo e máquina BLOQUEADA!")
             st.rerun()
 
 st.divider()
@@ -131,6 +150,7 @@ st.divider()
 # --- HISTÓRICO E CONTADOR DIÁRIO ---
 st.subheader("📋 Histórico de Operações")
 
+ARQUIVO_LOG = "historico_uso.csv"
 colunas_desejadas = ["Data", "Hora Início", "Hora Fim", "Operador", "Grelhas Limpas"]
 
 if os.path.exists(ARQUIVO_LOG):
