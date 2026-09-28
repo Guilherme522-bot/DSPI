@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -11,35 +12,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Função auxiliar para capturar a hora exata no fuso horário de Brasília
+def obter_hora_brasilia():
+    return datetime.now(ZoneInfo("America/Sao_Paulo"))
+
 # --- ESTILIZAÇÃO VISUAL (CSS) ---
 st.markdown("""
-    <style>
-    .stApp {
-        margin-top: -20px;
-    }
-    div.stButton > button[data-testid="baseButton-primary"] {
-        background-color: #16a34a !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-primary"]:hover {
-        background-color: #15803d !important;
-    }
-    div.stButton > button[data-testid="baseButton-secondary"] {
-        background-color: #dc2626 !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-secondary"]:hover {
-        background-color: #b91c1c !important;
-    }
-    </style>
+    
 """, unsafe_allow_html=True)
 
 # URL direta com extensão dupla (.jpg.jpg) conforme detetado no GitHub
@@ -49,7 +28,6 @@ URL_LOGO_GITHUB_2 = "https://raw.githubusercontent.com/Guilherme522-bot/DSPI/mai
 # --- CABEÇALHO COM LOGÓTIPO ---
 col_logo1, col_logo2, col_logo3 = st.columns([1, 2, 1])
 with col_logo2:
-    # Tenta primeiro a URL com .jpg.jpg que está no seu GitHub
     try:
         st.image(URL_LOGO_GITHUB_1, use_container_width=True)
     except Exception:
@@ -83,14 +61,14 @@ with col_btn1:
             st.error("⚠️ Por favor, informe o nome do operador antes de iniciar!")
         else:
             st.session_state.em_execucao = True
-            st.session_state.hora_inicio = datetime.now()
+            st.session_state.hora_inicio = obter_hora_brasilia()
             st.success(f"🚀 Processo iniciado às {st.session_state.hora_inicio.strftime('%H:%M:%S')}!")
 
 with col_btn2:
     if st.button("🔴 PARAR", type="secondary", use_container_width=True):
         if st.session_state.em_execucao:
             st.session_state.em_execucao = False
-            hora_fim = datetime.now()
+            hora_fim = obter_hora_brasilia()
             st.warning(f"⏹️ Processo interrompido às {hora_fim.strftime('%H:%M:%S')}.")
         else:
             st.info("A máquina já está parada.")
@@ -119,7 +97,7 @@ if st.session_state.em_execucao:
         if grelhas_limpas <= 0:
             st.warning("⚠️ Informe uma quantidade maior que 0 para gravar.")
         else:
-            agora = datetime.now()
+            agora = obter_hora_brasilia()
             hora_inicio_str = st.session_state.hora_inicio.strftime("%H:%M:%S") if st.session_state.hora_inicio else agora.strftime("%H:%M:%S")
             hora_fim_str = agora.strftime("%H:%M:%S")
             data_str = agora.strftime("%Y-%m-%d")
@@ -144,7 +122,7 @@ if st.session_state.em_execucao:
                 except Exception:
                     novo_registro.to_csv(ARQUIVO_LOG, index=False)
             
-            st.session_state.hora_inicio = datetime.now()
+            st.session_state.hora_inicio = obter_hora_brasilia()
             st.success(f"✅ Registrado: {grelhas_limpas} grelha(s) por {operador} (Início: {hora_inicio_str} | Fim: {hora_fim_str})")
             st.rerun()
 
@@ -172,7 +150,7 @@ if not df_log.empty and "Data" in df_log.columns:
     else:
         df_log["Grelhas Limpas"] = 0
 
-    hoje_str = datetime.now().strftime("%Y-%m-%d")
+    hoje_str = obter_hora_brasilia().strftime("%Y-%m-%d")
     df_hoje = df_log[df_log['Data'].astype(str) == hoje_str]
     grelhas_hoje = df_hoje["Grelhas Limpas"].sum()
 
