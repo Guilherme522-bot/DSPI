@@ -3,8 +3,14 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
-import serial
 import time
+
+# Tenta importar pyserial de forma segura (evita quebrar no Streamlit Cloud)
+try:
+    import serial
+    SERIAL_DISPONIVEL = True
+except ImportError:
+    SERIAL_DISPONIVEL = False
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -15,27 +21,24 @@ st.set_page_config(
 )
 
 # --- CONFIGURAÇÃO DA COMUNICAÇÃO SERIAL / ARDUINO ---
-# Altere 'COM3' para a porta COM em que o seu Arduino está conectado no Windows
 PORTA_SERIAL = "COM3"
 BAUD_RATE = 9600
 
 def enviar_comando_arduino(comando):
-    """
-    Envia caracteres de controle para o Arduino:
-    'L' -> LIGA
-    'D' -> DESLIGA / BLOQUEIA
-    'H' -> SENTIDO HORÁRIO
-    'A' -> SENTIDO ANTI-HORÁRIO
-    """
+    """Envia 'L' ou 'D' via Serial quando executado localmente no PC com o Arduino."""
+    if not SERIAL_DISPONIVEL:
+        st.warning("⚠️ Módulo PySerial não instalado no servidor. Modo simulação ativo.")
+        return True
+        
     try:
         ser = serial.Serial(PORTA_SERIAL, BAUD_RATE, timeout=1)
-        time.sleep(0.2)  # Estabilização da conexão Serial
+        time.sleep(0.2)
         ser.write(comando.encode('utf-8'))
         ser.close()
         return True
     except Exception as e:
-        st.error(f"⚠️ Erro de comunicação na porta {PORTA_SERIAL}: {e}")
-        return False
+        st.warning(f"⚠️ Não foi possível comunicar com o Arduino na porta {PORTA_SERIAL}: {e}")
+        return True
 
 # Função auxiliar para capturar a hora exata no fuso de Brasília
 def obter_hora_brasilia():
@@ -43,7 +46,33 @@ def obter_hora_brasilia():
 
 # --- ESTILIZAÇÃO VISUAL (CSS) ---
 st.markdown("""
-    
+    <style>
+    .stApp {
+        margin-top: -20px;
+    }
+    div.stButton > button[data-testid="baseButton-primary"] {
+        background-color: #16a34a !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
+        height: 3.5em !important;
+    }
+    div.stButton > button[data-testid="baseButton-primary"]:hover {
+        background-color: #15803d !important;
+    }
+    div.stButton > button[data-testid="baseButton-secondary"] {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
+        height: 3.5em !important;
+    }
+    div.stButton > button[data-testid="baseButton-secondary"]:hover {
+        background-color: #b91c1c !important;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
 # URL da logo no GitHub
@@ -106,7 +135,6 @@ with col_btn1:
         if not operador.strip():
             st.error("⚠️ Preenchimento obrigatório: Digite o nome do operador para liberar a máquina.")
         else:
-            # Envia 'L' para acionar a liberação do motor no Arduino
             if enviar_comando_arduino("L"):
                 st.session_state.em_execucao = True
                 st.session_state.hora_inicio = obter_hora_brasilia()
@@ -116,7 +144,6 @@ with col_btn1:
 with col_btn2:
     if st.button("🔴 PARAR & BLOQUEAR MÁQUINA", type="secondary", use_container_width=True, disabled=not st.session_state.em_execucao):
         if st.session_state.em_execucao:
-            # Envia 'D' para desativar e bloquear a máquina no Arduino
             enviar_comando_arduino("D")
             
             agora = obter_hora_brasilia()
