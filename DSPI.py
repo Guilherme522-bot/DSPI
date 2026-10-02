@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import os
 import time
 
-# Tenta importar pyserial de forma segura (evita quebrar no Streamlit Cloud)
+# Tenta importar pyserial de forma segura
 try:
     import serial
     SERIAL_DISPONIVEL = True
@@ -21,14 +21,18 @@ st.set_page_config(
 )
 
 # --- CONFIGURAÇÃO DA COMUNICAÇÃO SERIAL / ARDUINO ---
+# Altera "COM3" para a porta exata onde o Arduino está conectado
 PORTA_SERIAL = "COM3"
 BAUD_RATE = 9600
 
 def enviar_comando_arduino(comando):
-    """Envia 'L' ou 'D' via Serial quando executado localmente no PC com o Arduino."""
+    """
+    Envia 'L' ou 'D' via Serial para o Arduino.
+    Se falhar ou o Arduino não estiver conectado, bloqueia a liberação e retorna False.
+    """
     if not SERIAL_DISPONIVEL:
-        st.warning("⚠️ Módulo PySerial não instalado no servidor. Modo simulação ativo.")
-        return True
+        st.error("❌ Módulo PySerial não instalado. Impossível comunicar com o hardware.")
+        return False
         
     try:
         ser = serial.Serial(PORTA_SERIAL, BAUD_RATE, timeout=1)
@@ -37,8 +41,8 @@ def enviar_comando_arduino(comando):
         ser.close()
         return True
     except Exception as e:
-        st.warning(f"⚠️ Não foi possível comunicar com o Arduino na porta {PORTA_SERIAL}: {e}")
-        return True
+        st.error(f"❌ Falha de Conexão com o Arduino na porta {PORTA_SERIAL}! Conecte o cabo USB/Bluetooth e tente novamente.")
+        return False
 
 # Função auxiliar para capturar a hora exata no fuso de Brasília
 def obter_hora_brasilia():
@@ -46,33 +50,7 @@ def obter_hora_brasilia():
 
 # --- ESTILIZAÇÃO VISUAL (CSS) ---
 st.markdown("""
-    <style>
-    .stApp {
-        margin-top: -20px;
-    }
-    div.stButton > button[data-testid="baseButton-primary"] {
-        background-color: #16a34a !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-primary"]:hover {
-        background-color: #15803d !important;
-    }
-    div.stButton > button[data-testid="baseButton-secondary"] {
-        background-color: #dc2626 !important;
-        color: #ffffff !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        height: 3.5em !important;
-    }
-    div.stButton > button[data-testid="baseButton-secondary"]:hover {
-        background-color: #b91c1c !important;
-    }
-    </style>
+    
 """, unsafe_allow_html=True)
 
 # URL da logo no GitHub
@@ -126,7 +104,7 @@ grelhas_limpas = st.number_input(
 st.divider()
 
 # --- PAINEL DE COMANDO ---
-st.subheader("🕹️ Painel de Comando")
+st.subheader("🕹️️ Painel de Comando")
 
 col_btn1, col_btn2 = st.columns(2)
 
@@ -135,6 +113,7 @@ with col_btn1:
         if not operador.strip():
             st.error("⚠️ Preenchimento obrigatório: Digite o nome do operador para liberar a máquina.")
         else:
+            # Só altera o estado da tela para "Liberado" se a comunicação Serial responder True
             if enviar_comando_arduino("L"):
                 st.session_state.em_execucao = True
                 st.session_state.hora_inicio = obter_hora_brasilia()
