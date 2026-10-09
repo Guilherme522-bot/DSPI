@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # --- CONFIGURAÇÃO DA COMUNICAÇÃO SERIAL / ARDUINO ---
-PORTA_SERIAL = "COM3"
+PORTA_SERIAL = "COM5"
 BAUD_RATE = 9600
 
 def enviar_comando_arduino(comandos):
