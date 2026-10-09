@@ -21,36 +21,69 @@ st.set_page_config(
 )
 
 # --- CONFIGURAÇÃO DA COMUNICAÇÃO SERIAL / ARDUINO ---
-# Altera "COM3" para a porta exata onde o Arduino está conectado
 PORTA_SERIAL = "COM3"
 BAUD_RATE = 9600
 
-def enviar_comando_arduino(comando):
+def enviar_comando_arduino(comandos):
     """
-    Envia 'L' ou 'D' via Serial para o Arduino.
-    Se falhar ou o Arduino não estiver conectado, bloqueia a liberação e retorna False.
+    Envia caracteres ('H', 'A', 'L', 'D') via Serial/Bluetooth para o Arduino.
+    Aceita um único comando em caractere ou uma lista de comandos sequenciais.
     """
     if not SERIAL_DISPONIVEL:
-        st.error("❌ Módulo PySerial não instalado. Impossível comunicar com o hardware.")
+        st.error("❌ Módulo PySerial não instalado no ambiente Python.")
         return False
         
     try:
         ser = serial.Serial(PORTA_SERIAL, BAUD_RATE, timeout=1)
-        time.sleep(0.2)
-        ser.write(comando.encode('utf-8'))
+        time.sleep(0.3)  # Aguarda estabilizar a porta
+        
+        # Garante que seja uma lista para envio padronizado
+        if isinstance(comandos, str):
+            comandos = [comandos]
+            
+        for cmd in comandos:
+            ser.write(cmd.encode('utf-8'))
+            time.sleep(0.15)  # Intervalo de segurança entre comandos
+            
         ser.close()
         return True
     except Exception as e:
-        st.error(f"❌ Falha de Conexão com o Arduino na porta {PORTA_SERIAL}! Conecte o cabo USB/Bluetooth e tente novamente.")
+        st.error(f"❌ Falha de Conexão na porta {PORTA_SERIAL}! Verifique o cabo/Bluetooth. Detalhes: {e}")
         return False
 
-# Função auxiliar para capturar a hora exata no fuso de Brasília
+# Função para capturar a hora exata no fuso de Brasília
 def obter_hora_brasilia():
     return datetime.now(ZoneInfo("America/Sao_Paulo"))
 
 # --- ESTILIZAÇÃO VISUAL (CSS) ---
 st.markdown("""
-    
+    <style>
+    .stApp {
+        margin-top: -20px;
+    }
+    div.stButton > button[data-testid="baseButton-primary"] {
+        background-color: #16a34a !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
+        height: 3.5em !important;
+    }
+    div.stButton > button[data-testid="baseButton-primary"]:hover {
+        background-color: #15803d !important;
+    }
+    div.stButton > button[data-testid="baseButton-secondary"] {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
+        height: 3.5em !important;
+    }
+    div.stButton > button[data-testid="baseButton-secondary"]:hover {
+        background-color: #b91c1c !important;
+    }
+    </style>
 """, unsafe_allow_html=True)
 
 # URL da logo no GitHub
@@ -70,13 +103,13 @@ st.caption("Sistema de Controle e Liberação de Máquina")
 
 st.divider()
 
-# --- INICIALIZAÇÃO DE ESTADOS ---
+# --- INICIALIZAÇÃO DE ESTADOS DA SESSÃO ---
 if "em_execucao" not in st.session_state:
     st.session_state.em_execucao = False
 if "hora_inicio" not in st.session_state:
     st.session_state.hora_inicio = None
 
-# --- STATUS DA MÁQUINA (BLOQUEADO / LIBERADO) ---
+# --- STATUS DA MÁQUINA ---
 if st.session_state.em_execucao:
     st.success("🟢 **MÁQUINA LIBERADA E EM OPERAÇÃO**")
 else:
@@ -84,7 +117,7 @@ else:
 
 st.divider()
 
-# --- OPERADOR E PARÂMETROS ---
+# --- IDENTIFICAÇÃO DO OPERADOR E PARÂMETROS ---
 st.subheader("👤 Identificação do Operador")
 operador = st.text_input(
     "Nome do Operador:", 
@@ -92,19 +125,29 @@ operador = st.text_input(
     disabled=st.session_state.em_execucao
 )
 
-grelhas_limpas = st.number_input(
-    "Quantidade de Grelhas a Limpar nesta sessão:", 
-    min_value=1, 
-    step=1, 
-    value=1,
-    disabled=st.session_state.em_execucao,
-    help="Informe quantas grelhas serão limpas durante este ciclo."
-)
+col_param1, col_param2 = st.columns(2)
+
+with col_param1:
+    grelhas_limpas = st.number_input(
+        "Quantidade de Grelhas a Limpar nesta sessão:", 
+        min_value=1, 
+        step=1, 
+        value=10,
+        disabled=st.session_state.em_execucao
+    )
+
+with col_param2:
+    sentido_rotacao = st.selectbox(
+        "Sentido de Rotação:",
+        options=["Horário", "Anti-Horário"],
+        disabled=st.session_state.em_execucao,
+        help="Define o sentido do motor antes de iniciar a operação."
+    )
 
 st.divider()
 
 # --- PAINEL DE COMANDO ---
-st.subheader("🕹️️ Painel de Comando")
+st.subheader("🕹 Painel de Comando")
 
 col_btn1, col_btn2 = st.columns(2)
 
@@ -113,16 +156,20 @@ with col_btn1:
         if not operador.strip():
             st.error("⚠️ Preenchimento obrigatório: Digite o nome do operador para liberar a máquina.")
         else:
-            # Só altera o estado da tela para "Liberado" se a comunicação Serial responder True
-            if enviar_comando_arduino("L"):
+            # 1. Determina o comando do sentido ('H' ou 'A')
+            cmd_sentido = "H" if sentido_rotacao == "Horário" else "A"
+            
+            # 2. Envia primeiro a direção ('H'/'A') e em seguida a liberação ('L')
+            if enviar_comando_arduino([cmd_sentido, "L"]):
                 st.session_state.em_execucao = True
                 st.session_state.hora_inicio = obter_hora_brasilia()
-                st.success(f"🚀 Máquina liberada com sucesso às {st.session_state.hora_inicio.strftime('%H:%M:%S')}!")
+                st.success(f"🚀 Máquina iniciada em sentido {sentido_rotacao}!")
                 st.rerun()
 
 with col_btn2:
     if st.button("🔴 PARAR & BLOQUEAR MÁQUINA", type="secondary", use_container_width=True, disabled=not st.session_state.em_execucao):
         if st.session_state.em_execucao:
+            # Envia 'D' para desligar o motor e colocar o Arduino em estado de bloqueio
             enviar_comando_arduino("D")
             
             agora = obter_hora_brasilia()
@@ -135,7 +182,8 @@ with col_btn2:
                 "Hora Início": hora_inicio_str,
                 "Hora Fim": hora_fim_str,
                 "Operador": operador,
-                "Grelhas Limpas": grelhas_limpas
+                "Grelhas Limpas": grelhas_limpas,
+                "Sentido": sentido_rotacao
             }])
             
             ARQUIVO_LOG = "historico_uso.csv"
@@ -153,11 +201,11 @@ with col_btn2:
 
 st.divider()
 
-# --- HISTÓRICO E CONTADOR DIÁRIO ---
+# --- HISTÓRICO E METRICAS DIÁRIAS ---
 st.subheader("📋 Histórico de Operações")
 
 ARQUIVO_LOG = "historico_uso.csv"
-colunas_desejadas = ["Data", "Hora Início", "Hora Fim", "Operador", "Grelhas Limpas"]
+colunas_desejadas = ["Data", "Hora Início", "Hora Fim", "Operador", "Grelhas Limpas", "Sentido"]
 
 if os.path.exists(ARQUIVO_LOG):
     try:
